@@ -6,17 +6,14 @@
 //! wait(), but the only real reasonable one for a multi-threaded program is
 //! to listen for SIGCHLD.
 //!
-//! With this in mind, the waiting mechanism with a timeout barely uses
-//! waitpid() at all. There are a few times that waitpid() is invoked with
-//! WNOHANG, but otherwise all the necessary blocking is done by waiting for
-//! a SIGCHLD to arrive (and that blocking has a timeout). Note, however,
-//! that waitpid() is still used to actually reap the child.
+//! With this in mind, the waiting mechanism with a timeout only uses
+//! waitpid() with WNOHANG, but otherwise all the necessary blocking is done by
+//! waiting for a SIGCHLD to arrive (and that blocking has a timeout). Note,
+//! however, that waitpid() is still used to actually reap the child.
 //!
 //! Signal handling is super tricky in general, and this is no exception. Due
 //! to the async nature of SIGCHLD, we use the self-pipe trick to transmit
 //! data out of the signal handler to the rest of the application.
-//!
-//! TODO: more dox about impl
 
 #![allow(bad_style)]
 
