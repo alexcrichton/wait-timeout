@@ -29,7 +29,7 @@ use std::os::unix::prelude::*;
 use std::process::Child;
 use std::sync::{Once, ONCE_INIT, Mutex};
 
-use libc::{self, c_int, c_ulong, timeval, suseconds_t, time_t};
+use libc::{self, c_int, timeval, suseconds_t, time_t};
 use libc::funcs::bsd44::ioctl;
 use time;
 
@@ -42,9 +42,9 @@ const WNOHANG: c_int = 1;
 
 cfg_if! {
     if #[cfg(target_os = "macos")] {
-        const FIONBIO: c_ulong = 0x8004667e;
+        const FIONBIO: libc::c_ulong = 0x8004667e;
     } else if #[cfg(target_os = "linux")] {
-        const FIONBIO: c_ulong = 0x5421;
+        const FIONBIO: c_int = 0x5421;
     } else {
         // unknown ...
     }
@@ -75,10 +75,6 @@ pub fn wait_timeout_ms(child: &mut Child, ms: u32)
 
 impl State {
     fn init() {
-        // Ensure we're Send/Sync to safely throw into a static
-        fn assert<T: Send + Sync>() {}
-        assert::<State>();
-
         unsafe {
             // Create our "self pipe" and then set both ends to nonblocking
             // mode.

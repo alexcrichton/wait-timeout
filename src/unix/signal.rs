@@ -41,13 +41,13 @@ cfg_if! {
         }
 
         #[repr(C)]
-        #[cfg(target_word_size = "32")]
+        #[cfg(target_pointer_width = "32")]
         pub struct sigset_t {
             __val: [c_ulong; 32],
         }
 
         #[repr(C)]
-        #[cfg(target_word_size = "64")]
+        #[cfg(target_pointer_width = "64")]
         pub struct sigset_t {
             __val: [c_ulong; 16],
         }
