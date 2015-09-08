@@ -1,0 +1,9 @@
+[package]
+name = "wait-timeout"
+version = "0.1.0"
+authors = ["Alex Crichton <alex@alexcrichton.com>"]
+
+[dependencies]
+libc = "0.1"
+cfg-if = "0.1"
+time = "0.1"
