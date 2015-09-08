@@ -1,7 +1,30 @@
 //! A crate to wait on a child process with a particular timeout.
 //!
 //! This crate is an implementation for Unix and Windows of the ability to wait
-//! on a child process with a timeout specified. TODO: more impl docs.
+//! on a child process with a timeout specified. On Windows the implementation
+//! is fairly trivial as it's just a call to `WaitForSingleObject` with a
+//! timeout argument, but on Unix the implementation is much more involved. The
+//! current implementation registeres a `SIGCHLD` handler and initializes some
+//! global state. If your application is otherwise handling `SIGCHLD` then bugs
+//! may arise.
+//!
+//! # Example
+//!
+//! ```no_run
+//! use std::process::Command;
+//! use wait_timeout::ChildExt;
+//!
+//! let mut child = Command::new("foo").spawn().unwrap();
+//!
+//! let status_code = match child.wait_timeout_ms(1_000).unwrap() {
+//!     Some(status) => status.code(),
+//!     None => {
+//!         // child hasn't exited yet
+//!         child.kill().unwrap();
+//!         child.wait().unwrap().code()
+//!     }
+//! };
+//! ```
 
 #![deny(missing_docs, warnings)]
 
