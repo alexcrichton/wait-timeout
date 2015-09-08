@@ -1,5 +1,6 @@
 # wait-timeout
 
+[![Build Status](https://travis-ci.org/alexcrichton/wait-timeout.svg?branch=master)](https://travis-ci.org/alexcrichton/wait-timeout)
 
 [Documentation](http://alexcrichton.com/wait-timeout)
 
