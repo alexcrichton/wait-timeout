@@ -5,8 +5,10 @@
 
 #![deny(missing_docs, warnings)]
 
+extern crate kernel32;
 extern crate libc;
 extern crate time;
+extern crate winapi;
 #[macro_use] extern crate cfg_if;
 
 use std::fmt;
@@ -21,6 +23,8 @@ use std::process::Child;
 pub struct ExitStatus(imp::ExitStatus);
 
 #[cfg(unix)] #[path = "unix/mod.rs"]
+mod imp;
+#[cfg(windows)] #[path = "windows.rs"]
 mod imp;
 
 /// Extension methods for the standard `std::process::Child` type.
