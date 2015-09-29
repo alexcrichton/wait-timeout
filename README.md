@@ -12,6 +12,3 @@ Rust crate for waiting on a `Child` process with a timeout specified.
 [dependencies]
 wait-timeout = "0.1"
 ```
-
-> **NOTE**: this library currently requires a beta compiler but will compile on
->           stable Rust 1.3.
