@@ -38,7 +38,7 @@ fn smoke_success() {
     let end = time::precise_time_s();
     assert!(status.success());
 
-    assert!(end - start < 0.100);
+    assert!(end - start < 0.500);
 }
 
 #[test]
