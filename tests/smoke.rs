@@ -20,6 +20,13 @@ fn sleeper(ms: u32) -> Child {
     t!(Command::new(me).arg(ms.to_string()).spawn())
 }
 
+fn exit(code: u32) -> Child {
+    let mut me = env::current_exe().unwrap();
+    me.pop();
+    me.push("exit");
+    t!(Command::new(me).arg(code.to_string()).spawn())
+}
+
 #[test]
 fn smoke_insta_timeout() {
     let mut child = sleeper(1_000);
@@ -52,4 +59,23 @@ fn smoke_timeout() {
     t!(child.kill());
     let status = t!(child.wait());
     assert!(!status.success());
+}
+
+#[test]
+fn exit_codes() {
+    let mut child = exit(0);
+    let status = t!(child.wait_timeout_ms(1_000)).unwrap();
+    assert_eq!(status.code(), Some(0));
+
+    let mut child = exit(1);
+    let status = t!(child.wait_timeout_ms(1_000)).unwrap();
+    assert_eq!(status.code(), Some(1));
+
+    // check STILL_ACTIVE on windows, on unix this ends up just getting
+    // truncated so don't bother with it.
+    if cfg!(windows) {
+        let mut child = exit(259);
+        let status = t!(child.wait_timeout_ms(1_000)).unwrap();
+        assert_eq!(status.code(), Some(259));
+    }
 }

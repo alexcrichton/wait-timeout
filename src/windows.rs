@@ -12,28 +12,17 @@ pub struct ExitStatus(DWORD);
 
 pub fn wait_timeout_ms(child: &mut Child, ms: u32)
                        -> io::Result<Option<ExitStatus>> {
-    if let Some(status) = try!(try_wait(child)) {
-        return Ok(Some(status))
-    }
     unsafe {
         match WaitForSingleObject(child.as_raw_handle(), ms) {
-            WAIT_OBJECT_0 |
-            WAIT_TIMEOUT => {}
+            WAIT_OBJECT_0 => {}
+            WAIT_TIMEOUT => return Ok(None),
             _ => return Err(io::Error::last_os_error()),
         }
-    }
-    try_wait(child)
-}
-
-fn try_wait(child: &mut Child) -> io::Result<Option<ExitStatus>> {
-    unsafe {
         let mut status = 0;
         if GetExitCodeProcess(child.as_raw_handle(), &mut status) == FALSE {
             Err(io::Error::last_os_error())
-        } else if status != STILL_ACTIVE {
-            Ok(Some(ExitStatus(status)))
         } else {
-            Ok(None)
+            Ok(Some(ExitStatus(status)))
         }
     }
 }
