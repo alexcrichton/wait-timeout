@@ -5,8 +5,6 @@ use std::io;
 use kernel32::*;
 use winapi::*;
 
-const STILL_ACTIVE: DWORD = 259;
-
 #[derive(Eq, PartialEq, Copy, Clone, Debug)]
 pub struct ExitStatus(DWORD);
 
