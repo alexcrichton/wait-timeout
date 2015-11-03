@@ -26,26 +26,11 @@ use std::os::unix::prelude::*;
 use std::process::Child;
 use std::sync::{Once, ONCE_INIT, Mutex};
 
-use libc::{self, c_int, timeval, suseconds_t, time_t};
-use libc::funcs::bsd44::ioctl;
+use libc::*;
 use time;
-
-mod signal;
-use self::signal::*;
-mod select;
-use self::select::*;
-
-const WNOHANG: c_int = 1;
-
-cfg_if! {
-    if #[cfg(target_os = "macos")] {
-        const FIONBIO: libc::c_ulong = 0x8004667e;
-    } else if #[cfg(target_os = "linux")] {
-        const FIONBIO: c_int = 0x5421;
-    } else {
-        // unknown ...
-    }
-}
+//
+// mod select;
+// use self::select::*;
 
 static INIT: Once = ONCE_INIT;
 static mut STATE: *mut State = 0 as *mut _;
@@ -75,7 +60,7 @@ impl State {
         unsafe {
             // Create our "self pipe" and then set both ends to nonblocking
             // mode.
-            let (read, write) = pipe().unwrap();
+            let (read, write) = file_pair().unwrap();
 
             let mut state = Box::new(State {
                 prev: mem::zeroed(),
@@ -86,7 +71,7 @@ impl State {
 
             // Register our sigchld handler
             let mut new: sigaction = mem::zeroed();
-            new.sa_handler = sigchld_handler;
+            new.sa_sigaction = sigchld_handler as usize;
             new.sa_flags = SA_NOCLDSTOP | SA_RESTART;
             assert_eq!(sigaction(SIGCHLD, &new, &mut state.prev), 0);
 
@@ -98,7 +83,7 @@ impl State {
                        -> io::Result<Option<ExitStatus>> {
         // First up, prep our notification pipe which will tell us when our
         // child has been reaped (other threads may signal this pipe).
-        let (read, write) = try!(pipe());
+        let (read, write) = try!(file_pair());
         let id = child.id() as c_int;
 
         // Next, take a lock on the map of children currently waiting. Right
@@ -138,9 +123,10 @@ impl State {
                 tv_usec: ((timeout % 1_000_000_000) / 1000) as suseconds_t,
             };
             let r = unsafe {
-                let mut set: fd_set = mem::zeroed();
-                fd_set(&mut set, self.read.as_raw_fd());
-                fd_set(&mut set, read.as_raw_fd());
+                let mut set: fd_set = mem::uninitialized();
+                FD_ZERO(&mut set);
+                FD_SET(self.read.as_raw_fd(), &mut set);
+                FD_SET(read.as_raw_fd(), &mut set);
                 let max = cmp::max(self.read.as_raw_fd(), read.as_raw_fd()) + 1;
                 select(max, &mut set, 0 as *mut _, 0 as *mut _, &mut timeout)
             };
@@ -204,11 +190,11 @@ impl State {
     }
 }
 
-fn pipe() -> io::Result<(File, File)> {
+fn file_pair() -> io::Result<(File, File)> {
     // TODO: CLOEXEC
     unsafe {
         let mut pipes = [0; 2];
-        if libc::pipe(pipes.as_mut_ptr()) != 0 {
+        if pipe(pipes.as_mut_ptr()) != 0 {
             return Err(io::Error::last_os_error())
         }
         let set = 1 as c_int;
@@ -220,7 +206,7 @@ fn pipe() -> io::Result<(File, File)> {
 
 fn try_wait(id: c_int) -> io::Result<Option<ExitStatus>> {
     let mut status = 0;
-    match unsafe { libc::waitpid(id, &mut status, WNOHANG) } {
+    match unsafe { waitpid(id, &mut status, WNOHANG) } {
         0 => Ok(None),
         n if n < 0 => return Err(io::Error::last_os_error()),
         n => {
@@ -275,36 +261,28 @@ extern fn sigchld_handler(_signum: c_int) {
     notify(&state.write);
 }
 
-cfg_if! {
-    if #[cfg(any(target_os = "linux", target_os = "android"))] {
-        fn WIFEXITED(status: i32) -> bool { (status & 0xff) == 0 }
-        fn WEXITSTATUS(status: i32) -> i32 { (status >> 8) & 0xff }
-        fn WTERMSIG(status: i32) -> i32 { status & 0x7f }
-    } else {
-        fn WIFEXITED(status: i32) -> bool { (status & 0x7f) == 0 }
-        fn WEXITSTATUS(status: i32) -> i32 { status >> 8 }
-        fn WTERMSIG(status: i32) -> i32 { status & 0o177 }
-    }
-}
-
 impl ExitStatus {
     pub fn success(&self) -> bool {
         self.code() == Some(0)
     }
 
     pub fn code(&self) -> Option<i32> {
-        if WIFEXITED(self.0) {
-            Some(WEXITSTATUS(self.0))
-        } else {
-            None
+        unsafe {
+            if WIFEXITED(self.0) {
+                Some(WEXITSTATUS(self.0))
+            } else {
+                None
+            }
         }
     }
 
     pub fn unix_signal(&self) -> Option<i32> {
-        if !WIFEXITED(self.0) {
-            Some(WTERMSIG(self.0))
-        } else {
-            None
+        unsafe {
+            if !WIFEXITED(self.0) {
+                Some(WTERMSIG(self.0))
+            } else {
+                None
+            }
         }
     }
 }

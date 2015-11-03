@@ -45,7 +45,7 @@ use std::process::Child;
 #[derive(Eq, PartialEq, Copy, Clone, Debug)]
 pub struct ExitStatus(imp::ExitStatus);
 
-#[cfg(unix)] #[path = "unix/mod.rs"]
+#[cfg(unix)] #[path = "unix.rs"]
 mod imp;
 #[cfg(windows)] #[path = "windows.rs"]
 mod imp;
