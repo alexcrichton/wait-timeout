@@ -12,7 +12,7 @@ pub struct ExitStatus(DWORD);
 pub fn wait_timeout(child: &mut Child, dur: Duration)
                        -> io::Result<Option<ExitStatus>> {
     let ms = dur.as_secs().checked_mul(1000).and_then(|amt| {
-        amt.checked_add(dur.subsec_nanos() as u64)
+        amt.checked_add((dur.subsec_nanos() / 1_000_000) as u64)
     }).expect("failed to convert duration to milliseconds");
     let ms = if ms > (DWORD::max_value() as u64) {
         DWORD::max_value()
