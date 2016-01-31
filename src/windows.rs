@@ -1,6 +1,7 @@
+use std::io;
 use std::os::windows::prelude::*;
 use std::process::Child;
-use std::io;
+use std::time::Duration;
 
 use kernel32::*;
 use winapi::*;
@@ -8,8 +9,16 @@ use winapi::*;
 #[derive(Eq, PartialEq, Copy, Clone, Debug)]
 pub struct ExitStatus(DWORD);
 
-pub fn wait_timeout_ms(child: &mut Child, ms: u32)
+pub fn wait_timeout(child: &mut Child, dur: Duration)
                        -> io::Result<Option<ExitStatus>> {
+    let ms = dur.as_secs().checked_mul(1000).and_then(|amt| {
+        amt.checked_add(dur.subsec_nanos() as u64)
+    }).expect("failed to convert duration to milliseconds");
+    let ms = if ms > (DWORD::max_value() as u64) {
+        DWORD::max_value()
+    } else {
+        ms as DWORD
+    };
     unsafe {
         match WaitForSingleObject(child.as_raw_handle(), ms) {
             WAIT_OBJECT_0 => {}

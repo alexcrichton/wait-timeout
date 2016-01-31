@@ -25,18 +25,16 @@ use std::mem;
 use std::os::unix::prelude::*;
 use std::process::Child;
 use std::sync::{Once, ONCE_INIT, Mutex};
+use std::time::Duration;
 
-use libc::*;
+use libc::{self, c_int};
 use time;
-//
-// mod select;
-// use self::select::*;
 
 static INIT: Once = ONCE_INIT;
 static mut STATE: *mut State = 0 as *mut _;
 
 struct State {
-    prev: sigaction,
+    prev: libc::sigaction,
     write: File,
     read: File,
     map: Mutex<StateMap>,
@@ -47,11 +45,11 @@ type StateMap = HashMap<c_int, (File, Option<ExitStatus>)>;
 #[derive(Eq, PartialEq, Copy, Clone, Debug)]
 pub struct ExitStatus(c_int);
 
-pub fn wait_timeout_ms(child: &mut Child, ms: u32)
-                       -> io::Result<Option<ExitStatus>> {
+pub fn wait_timeout(child: &mut Child, dur: Duration)
+                    -> io::Result<Option<ExitStatus>> {
     INIT.call_once(State::init);
     unsafe {
-        (*STATE).wait_timeout_ms(child, ms)
+        (*STATE).wait_timeout(child, dur)
     }
 }
 
@@ -70,16 +68,16 @@ impl State {
             });
 
             // Register our sigchld handler
-            let mut new: sigaction = mem::zeroed();
+            let mut new: libc::sigaction = mem::zeroed();
             new.sa_sigaction = sigchld_handler as usize;
-            new.sa_flags = SA_NOCLDSTOP | SA_RESTART;
-            assert_eq!(sigaction(SIGCHLD, &new, &mut state.prev), 0);
+            new.sa_flags = libc::SA_NOCLDSTOP | libc::SA_RESTART;
+            assert_eq!(libc::sigaction(libc::SIGCHLD, &new, &mut state.prev), 0);
 
             STATE = mem::transmute(state);
         }
     }
 
-    fn wait_timeout_ms(&self, child: &mut Child, ms: u32)
+    fn wait_timeout(&self, child: &mut Child, dur: Duration)
                        -> io::Result<Option<ExitStatus>> {
         // First up, prep our notification pipe which will tell us when our
         // child has been reaped (other threads may signal this pipe).
@@ -111,24 +109,27 @@ impl State {
         // Note that this happens in a loop for two reasons; we could
         // receive EINTR or we could pick up a SIGCHLD for other threads but not
         // actually be ready oureslves.
-        let end_time = time::precise_time_ns() + (ms as u64) * 1_000_000;
+        let end_time = time::precise_time_ns();
         loop {
             let cur_time = time::precise_time_ns();
-            if cur_time > end_time {
+            let nanos = cur_time - end_time;
+            let elapsed = Duration::new(nanos / 1_000_000_000,
+                                        (nanos % 1_000_000_000) as u32);
+            if elapsed >= dur {
                 break
             }
-            let timeout = end_time - cur_time;
-            let mut timeout = timeval {
-                tv_sec: (timeout / 1_000_000_000) as time_t,
-                tv_usec: ((timeout % 1_000_000_000) / 1000) as suseconds_t,
+            let timeout = dur - elapsed;
+            let mut timeout = libc::timeval {
+                tv_sec: timeout.as_secs() as libc::time_t,
+                tv_usec: (timeout.subsec_nanos() / 1000) as libc::suseconds_t,
             };
             let r = unsafe {
-                let mut set: fd_set = mem::uninitialized();
-                FD_ZERO(&mut set);
-                FD_SET(self.read.as_raw_fd(), &mut set);
-                FD_SET(read.as_raw_fd(), &mut set);
+                let mut set: libc::fd_set = mem::uninitialized();
+                libc::FD_ZERO(&mut set);
+                libc::FD_SET(self.read.as_raw_fd(), &mut set);
+                libc::FD_SET(read.as_raw_fd(), &mut set);
                 let max = cmp::max(self.read.as_raw_fd(), read.as_raw_fd()) + 1;
-                select(max, &mut set, 0 as *mut _, 0 as *mut _, &mut timeout)
+                libc::select(max, &mut set, 0 as *mut _, 0 as *mut _, &mut timeout)
             };
             let timeout = match r {
                 0 => true,
@@ -194,19 +195,19 @@ fn file_pair() -> io::Result<(File, File)> {
     // TODO: CLOEXEC
     unsafe {
         let mut pipes = [0; 2];
-        if pipe(pipes.as_mut_ptr()) != 0 {
+        if libc::pipe(pipes.as_mut_ptr()) != 0 {
             return Err(io::Error::last_os_error())
         }
         let set = 1 as c_int;
-        assert_eq!(ioctl(pipes[0], FIONBIO, &set), 0);
-        assert_eq!(ioctl(pipes[1], FIONBIO, &set), 0);
+        assert_eq!(libc::ioctl(pipes[0], libc::FIONBIO, &set), 0);
+        assert_eq!(libc::ioctl(pipes[1], libc::FIONBIO, &set), 0);
         Ok((File::from_raw_fd(pipes[0]), File::from_raw_fd(pipes[1])))
     }
 }
 
 fn try_wait(id: c_int) -> io::Result<Option<ExitStatus>> {
     let mut status = 0;
-    match unsafe { waitpid(id, &mut status, WNOHANG) } {
+    match unsafe { libc::waitpid(id, &mut status, libc::WNOHANG) } {
         0 => Ok(None),
         n if n < 0 => return Err(io::Error::last_os_error()),
         n => {
@@ -268,8 +269,8 @@ impl ExitStatus {
 
     pub fn code(&self) -> Option<i32> {
         unsafe {
-            if WIFEXITED(self.0) {
-                Some(WEXITSTATUS(self.0))
+            if libc::WIFEXITED(self.0) {
+                Some(libc::WEXITSTATUS(self.0))
             } else {
                 None
             }
@@ -278,8 +279,8 @@ impl ExitStatus {
 
     pub fn unix_signal(&self) -> Option<i32> {
         unsafe {
-            if !WIFEXITED(self.0) {
-                Some(WTERMSIG(self.0))
+            if !libc::WIFEXITED(self.0) {
+                Some(libc::WTERMSIG(self.0))
             } else {
                 None
             }

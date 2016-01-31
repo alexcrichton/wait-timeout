@@ -37,6 +37,7 @@ extern crate winapi;
 use std::fmt;
 use std::io;
 use std::process::Child;
+use std::time::Duration;
 
 /// Exit status from a child process.
 ///
@@ -52,6 +53,12 @@ mod imp;
 
 /// Extension methods for the standard `std::process::Child` type.
 pub trait ChildExt {
+    /// Deprecated, use `wait_timeout` instead.
+    #[doc(hidden)]
+    fn wait_timeout_ms(&mut self, ms: u32) -> io::Result<Option<ExitStatus>> {
+        self.wait_timeout(Duration::from_millis(ms as u64))
+    }
+
     /// Wait for this child to exit, timing out after `ms` milliseconds have
     /// elapsed.
     ///
@@ -72,12 +79,12 @@ pub trait ChildExt {
     /// spurious errors or have odd behavior on some platforms. If this
     /// function returns `Ok(None)`, however, it is safe to wait on the child
     /// with the normal libstd `wait` method.
-    fn wait_timeout_ms(&mut self, ms: u32) -> io::Result<Option<ExitStatus>>;
+    fn wait_timeout(&mut self, dur: Duration) -> io::Result<Option<ExitStatus>>;
 }
 
 impl ChildExt for Child {
-    fn wait_timeout_ms(&mut self, ms: u32) -> io::Result<Option<ExitStatus>> {
-        imp::wait_timeout_ms(self, ms).map(|m| m.map(ExitStatus))
+    fn wait_timeout(&mut self, dur: Duration) -> io::Result<Option<ExitStatus>> {
+        imp::wait_timeout(self, dur).map(|m| m.map(ExitStatus))
     }
 }
 
