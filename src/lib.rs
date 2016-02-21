@@ -28,10 +28,8 @@
 
 #![deny(missing_docs, warnings)]
 
-extern crate kernel32;
 extern crate libc;
 extern crate time;
-extern crate winapi;
 #[macro_use] extern crate cfg_if;
 
 use std::fmt;
