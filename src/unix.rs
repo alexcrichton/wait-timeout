@@ -28,7 +28,6 @@ use std::sync::{Once, ONCE_INIT, Mutex};
 use std::time::Duration;
 
 use libc::{self, c_int};
-use time;
 
 static INIT: Once = ONCE_INIT;
 static mut STATE: *mut State = 0 as *mut _;
@@ -109,9 +108,9 @@ impl State {
         // Note that this happens in a loop for two reasons; we could
         // receive EINTR or we could pick up a SIGCHLD for other threads but not
         // actually be ready oureslves.
-        let end_time = time::precise_time_ns();
+        let end_time = now_ns();
         loop {
-            let cur_time = time::precise_time_ns();
+            let cur_time = now_ns();
             let nanos = cur_time - end_time;
             let elapsed = Duration::new(nanos / 1_000_000_000,
                                         (nanos % 1_000_000_000) as u32);
@@ -243,6 +242,14 @@ fn notify(mut file: &File) {
                 panic!("bad error on write fd: {}", e)
             }
         }
+    }
+}
+
+fn now_ns() -> u64 {
+    unsafe {
+        let mut now: libc::timeval = mem::zeroed();
+        libc::gettimeofday(&mut now, 0 as *mut _);
+        (now.tv_sec as u64 * 1_000_000_000) + (now.tv_usec as u64 * 1_000)
     }
 }
 

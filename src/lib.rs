@@ -29,8 +29,6 @@
 #![deny(missing_docs, warnings)]
 
 extern crate libc;
-extern crate time;
-#[macro_use] extern crate cfg_if;
 
 use std::fmt;
 use std::io;
