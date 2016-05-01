@@ -30,17 +30,10 @@
 
 extern crate libc;
 
-use std::fmt;
 use std::io;
-use std::process::Child;
+use std::process::{Child, ExitStatus};
 use std::time::Duration;
-
-/// Exit status from a child process.
-///
-/// This type mirrors that in `std::process` but currently must be distinct as
-/// the one in `std::process` cannot be created.
-#[derive(Eq, PartialEq, Copy, Clone, Debug)]
-pub struct ExitStatus(imp::ExitStatus);
+use std::mem::transmute;
 
 #[cfg(unix)] #[path = "unix.rs"]
 mod imp;
@@ -80,44 +73,19 @@ pub trait ChildExt {
 
 impl ChildExt for Child {
     fn wait_timeout(&mut self, dur: Duration) -> io::Result<Option<ExitStatus>> {
-        imp::wait_timeout(self, dur).map(|m| m.map(ExitStatus))
+        imp::wait_timeout(self, dur).map(|m| m.map(From::from))
     }
 }
 
-impl ExitStatus {
-    /// Returns whether this exit status represents a successful execution.
-    ///
-    /// This typically means that the child process successfully exited with a
-    /// status code of 0.
-    pub fn success(&self) -> bool {
-        self.0.success()
-    }
+// XXX: Replace with ExitStatus::from_raw() after
+// https://github.com/rust-lang/rust/pull/33224 is merged and available
+// in the stable release.
+impl From<imp::ExitStatus> for ExitStatus {
 
-    /// Returns the code associated with the child's exit event.
-    ///
-    /// On Unix this can return `None` if the child instead exited because of a
-    /// signal. On Windows, however, this will always return `Some`.
-    pub fn code(&self) -> Option<i32> {
-        self.0.code()
-    }
-
-    /// Returns the Unix signal which terminated this process.
-    ///
-    /// Note that on Windows this will always return `None` and on Unix this
-    /// will return `None` if the process successfully exited otherwise.
-    pub fn unix_signal(&self) -> Option<i32> {
-        self.0.unix_signal()
-    }
-}
-
-impl fmt::Display for ExitStatus {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        if let Some(c) = self.code() {
-            write!(f, "exit code: {}", c)
-        } else if let Some(s) = self.unix_signal() {
-            write!(f, "signal: {}", s)
-        } else {
-            write!(f, "exit status: unknown")
-        }
+    // This is quite ugly hack that allows us to use ExitStatus from the
+    // stdlib. ExitStatus just wraps a number, so it should be relatively
+    // safe, but we rely on Rust's internal implementation!
+    fn from(s: imp::ExitStatus) -> ExitStatus {
+        unsafe { transmute(s) }
     }
 }

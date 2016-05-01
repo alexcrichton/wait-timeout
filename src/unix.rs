@@ -41,7 +41,8 @@ struct State {
 
 type StateMap = HashMap<c_int, (File, Option<ExitStatus>)>;
 
-#[derive(Eq, PartialEq, Copy, Clone, Debug)]
+// This should be exactly the same as std::sys::unix::process::ExitStatus!
+#[derive(PartialEq, Eq, Clone, Copy, Debug)]
 pub struct ExitStatus(c_int);
 
 pub fn wait_timeout(child: &mut Child, dur: Duration)
@@ -267,30 +268,4 @@ fn now_ns() -> u64 {
 extern fn sigchld_handler(_signum: c_int) {
     let state = unsafe { &*STATE };
     notify(&state.write);
-}
-
-impl ExitStatus {
-    pub fn success(&self) -> bool {
-        self.code() == Some(0)
-    }
-
-    pub fn code(&self) -> Option<i32> {
-        unsafe {
-            if libc::WIFEXITED(self.0) {
-                Some(libc::WEXITSTATUS(self.0))
-            } else {
-                None
-            }
-        }
-    }
-
-    pub fn unix_signal(&self) -> Option<i32> {
-        unsafe {
-            if !libc::WIFEXITED(self.0) {
-                Some(libc::WTERMSIG(self.0))
-            } else {
-                None
-            }
-        }
-    }
 }
