@@ -31,16 +31,39 @@
 extern crate libc;
 
 use std::fmt;
-use std::io;
-use std::process::Child;
+use std::io::{self, Read};
+use std::process::{Child, Command, Stdio};
 use std::time::Duration;
+use std::str;
 
 /// Exit status from a child process.
 ///
 /// This type mirrors that in `std::process` but currently must be distinct as
 /// the one in `std::process` cannot be created.
+//
+// XXX: Remove after https://github.com/rust-lang/rust/pull/33224 is merged and
+// available in the stable release.
 #[derive(Eq, PartialEq, Copy, Clone, Debug)]
 pub struct ExitStatus(imp::ExitStatus);
+
+/// The output of a finished process.
+///
+/// This type mirrors that in `std::process` but currently must be distinct as
+/// the `std::process::ExitStatus` cannot be created.
+//
+// XXX: Remove after https://github.com/rust-lang/rust/pull/33224 is merged and
+// available in the stable release.
+#[derive(PartialEq, Eq, Clone)]
+pub struct Output {
+    /// The status (exit code) of the process.
+    pub status: ExitStatus,
+
+    /// The data that the process wrote to stdout.
+    pub stdout: Vec<u8>,
+
+    /// The data that the process wrote to stderr.
+    pub stderr: Vec<u8>,
+}
 
 #[cfg(unix)] #[path = "unix.rs"]
 mod imp;
@@ -78,9 +101,70 @@ pub trait ChildExt {
     fn wait_timeout(&mut self, dur: Duration) -> io::Result<Option<ExitStatus>>;
 }
 
+/// Extension methods for the standard `std::process::Command` type.
+pub trait CommandExt {
+
+    /// Simultaneously waits for the child to exit and collect all remaining
+    /// output on the stdout/stderr handles, timing out after the specified
+    /// duration in milliseconds have elapsed.
+    ///
+    /// This method is the same as `Command::wait_with_output`,
+    /// but with a timeout.
+    ///
+    /// The stdin handle to the child process, if any, will be closed
+    /// before waiting. This helps avoid deadlock: it ensures that the
+    /// child does not block waiting for input from the parent, while
+    /// the parent waits for the child to exit.
+    fn wait_with_output(&mut self, timeout: Duration) -> io::Result<Output>;
+}
+
+
 impl ChildExt for Child {
     fn wait_timeout(&mut self, dur: Duration) -> io::Result<Option<ExitStatus>> {
         imp::wait_timeout(self, dur).map(|m| m.map(ExitStatus))
+    }
+}
+
+impl CommandExt for Command {
+
+    fn wait_with_output(&mut self, timeout: Duration) -> io::Result<Output> {
+        self.stdin(Stdio::null());
+        self.stdout(Stdio::piped());
+        self.stderr(Stdio::piped());
+
+        let mut child = try!(self.spawn());
+
+        match try!(child.wait_timeout(timeout)) {
+            Some(status) => {
+                let mut res = Output {
+                    status: status,
+                    stdout: Vec::new(),
+                    stderr: Vec::new(),
+                };
+
+                if let Some(mut io) = child.stdout {
+                    try!(io.read_to_end(&mut res.stdout));
+                }
+                if let Some(mut io) = child.stderr {
+                    try!(io.read_to_end(&mut res.stderr));
+                }
+
+                Ok(res)
+            },
+            // Child hasn't exited yet, kill him!
+            None => {
+                // Ignore error, maybe child already died or someone else
+                // killed him, that's fine.
+                if child.kill().is_ok() {
+                    try!(child.wait());
+                }
+
+                Err(io::Error::new(
+                    io::ErrorKind::TimedOut,
+                    "Command timed out, the process has been killed"
+                ))
+            },
+        }
     }
 }
 
@@ -119,5 +203,30 @@ impl fmt::Display for ExitStatus {
         } else {
             write!(f, "exit status: unknown")
         }
+    }
+}
+
+// If either stderr or stdout are valid utf8 strings it prints the valid
+// strings, otherwise it prints the byte sequence instead
+impl fmt::Debug for Output {
+    fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
+
+        let stdout_utf8 = str::from_utf8(&self.stdout);
+        let stdout_debug: &fmt::Debug = match stdout_utf8 {
+            Ok(ref str) => str,
+            Err(_) => &self.stdout
+        };
+
+        let stderr_utf8 = str::from_utf8(&self.stderr);
+        let stderr_debug: &fmt::Debug = match stderr_utf8 {
+            Ok(ref str) => str,
+            Err(_) => &self.stderr
+        };
+
+        fmt.debug_struct("Output")
+            .field("status", &self.status)
+            .field("stdout", stdout_debug)
+            .field("stderr", stderr_debug)
+            .finish()
     }
 }
