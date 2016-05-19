@@ -14,6 +14,3 @@ Windows platforms.
 
 [dependencies]
 libc = "0.2"
-
-[dev-dependencies]
-time = "0.1"
