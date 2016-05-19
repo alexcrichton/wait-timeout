@@ -1,8 +1,8 @@
-extern crate time;
 extern crate wait_timeout;
 
 use std::env;
 use std::process::{Command, Child};
+use std::time::{Duration, Instant};
 
 use wait_timeout::ChildExt;
 
@@ -39,22 +39,20 @@ fn smoke_insta_timeout() {
 
 #[test]
 fn smoke_success() {
-    let start = time::precise_time_s();
+    let start = Instant::now();
     let mut child = sleeper(0);
     let status = t!(child.wait_timeout_ms(1_000)).expect("should have succeeded");
-    let end = time::precise_time_s();
     assert!(status.success());
 
-    assert!(end - start < 0.500);
+    assert!(start.elapsed() < Duration::from_millis(500));
 }
 
 #[test]
 fn smoke_timeout() {
     let mut child = sleeper(1_000_000);
-    let start = time::precise_time_ns();
+    let start = Instant::now();
     assert_eq!(t!(child.wait_timeout_ms(100)), None);
-    let end = time::precise_time_ns();
-    assert!(end - start > 80 * 1_000_000);
+    assert!(start.elapsed() > Duration::from_millis(80));
 
     t!(child.kill());
     let status = t!(child.wait());
