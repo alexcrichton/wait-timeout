@@ -13,10 +13,12 @@
 //! ```no_run
 //! use std::process::Command;
 //! use wait_timeout::ChildExt;
+//! use std::time::Duration;
 //!
 //! let mut child = Command::new("foo").spawn().unwrap();
 //!
-//! let status_code = match child.wait_timeout_ms(1_000).unwrap() {
+//! let one_sec = Duration::from_secs(1);
+//! let status_code = match child.wait_timeout(one_sec).unwrap() {
 //!     Some(status) => status.code(),
 //!     None => {
 //!         // child hasn't exited yet
