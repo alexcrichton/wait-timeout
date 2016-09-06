@@ -69,7 +69,9 @@ impl State {
             // Register our sigchld handler
             let mut new: libc::sigaction = mem::zeroed();
             new.sa_sigaction = sigchld_handler as usize;
-            new.sa_flags = libc::SA_NOCLDSTOP | libc::SA_RESTART;
+            new.sa_flags = libc::SA_NOCLDSTOP |
+                           libc::SA_RESTART |
+                           libc::SA_SIGINFO;
             assert_eq!(libc::sigaction(libc::SIGCHLD, &new, &mut state.prev), 0);
 
             STATE = mem::transmute(state);
@@ -264,9 +266,28 @@ fn now_ns() -> u64 {
 // it. At that point we're guaranteed that there's something in the pipe
 // which will wake up the other end at some point, so we just allow this
 // signal to be coalesced with the pending signals on the pipe.
-extern fn sigchld_handler(_signum: c_int) {
-    let state = unsafe { &*STATE };
-    notify(&state.write);
+extern fn sigchld_handler(signum: c_int,
+                          info: *mut libc::siginfo_t,
+                          ptr: *mut libc::c_void) {
+    type FnSigaction = extern fn(c_int, *mut libc::siginfo_t, *mut libc::c_void);
+    type FnHandler = extern fn(c_int);
+
+    unsafe {
+        let state = &*STATE;
+        notify(&state.write);
+
+        let fnptr = state.prev.sa_sigaction;
+        if fnptr == 0 {
+            return
+        }
+        if state.prev.sa_flags & libc::SA_SIGINFO == 0 {
+            let action = mem::transmute::<usize, FnHandler>(fnptr);
+            action(signum)
+        } else {
+            let action = mem::transmute::<usize, FnSigaction>(fnptr);
+            action(signum, info, ptr)
+        }
+    }
 }
 
 impl ExitStatus {
