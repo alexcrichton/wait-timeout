@@ -16,6 +16,9 @@ macro_rules! t {
 fn sleeper(ms: u32) -> Child {
     let mut me = env::current_exe().unwrap();
     me.pop();
+    if me.ends_with("deps") {
+        me.pop();
+    }
     me.push("sleep");
     t!(Command::new(me).arg(ms.to_string()).spawn())
 }
@@ -23,6 +26,9 @@ fn sleeper(ms: u32) -> Child {
 fn exit(code: u32) -> Child {
     let mut me = env::current_exe().unwrap();
     me.pop();
+    if me.ends_with("deps") {
+        me.pop();
+    }
     me.push("exit");
     t!(Command::new(me).arg(code.to_string()).spawn())
 }
