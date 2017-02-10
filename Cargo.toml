@@ -11,6 +11,7 @@ description = """
 A crate to wait on a child process with a timeout specified across Unix and
 Windows platforms.
 """
+categories = ["os"]
 
 [badges]
 travis-ci = { repository = "alexcrichton/wait-timeout" }
