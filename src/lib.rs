@@ -29,6 +29,7 @@
 //! ```
 
 #![deny(missing_docs, warnings)]
+#![doc(html_root_url = "https://docs.rs/wait-timeout/0.1")]
 
 extern crate libc;
 
