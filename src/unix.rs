@@ -53,6 +53,7 @@ pub fn wait_timeout(child: &mut Child, dur: Duration)
 }
 
 impl State {
+    #[allow(unused_assignments)]
     fn init() {
         unsafe {
             // Create our "self pipe" and then set both ends to nonblocking
@@ -79,7 +80,6 @@ impl State {
             macro_rules! _as {
                 ($value:expr, $target:expr) => (
                     {
-                        #[allow(unused_assignments)]
                         let mut x = $target;
                         x = $value as _;
                         x
