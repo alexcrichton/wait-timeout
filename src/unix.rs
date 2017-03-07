@@ -52,6 +52,17 @@ pub fn wait_timeout(child: &mut Child, dur: Duration)
     }
 }
 
+// Do $value as type_of($target)
+macro_rules! _as {
+    ($value:expr, $target:expr) => (
+        {
+            let mut x = $target;
+            x = $value as _;
+            x
+        }
+    )
+}
+
 impl State {
     #[allow(unused_assignments)]
     fn init() {
@@ -76,17 +87,6 @@ impl State {
             // This is a workaround for the type mismatch in the definition of SA_*
             // constants for android. See https://github.com/rust-lang/libc/pull/511
             //
-            // Do $value as type_of($target)
-            macro_rules! _as {
-                ($value:expr, $target:expr) => (
-                    {
-                        let mut x = $target;
-                        x = $value as _;
-                        x
-                    }
-                )
-            }
-
             let sa_flags = new.sa_flags;
             new.sa_flags = _as!(libc::SA_NOCLDSTOP, sa_flags) |
                            _as!(libc::SA_RESTART, sa_flags) |
@@ -286,6 +286,7 @@ fn now_ns() -> u64 {
 // it. At that point we're guaranteed that there's something in the pipe
 // which will wake up the other end at some point, so we just allow this
 // signal to be coalesced with the pending signals on the pipe.
+#[allow(unused_assignments)]
 extern fn sigchld_handler(signum: c_int,
                           info: *mut libc::siginfo_t,
                           ptr: *mut libc::c_void) {
@@ -300,7 +301,12 @@ extern fn sigchld_handler(signum: c_int,
         if fnptr == 0 {
             return
         }
-        if state.prev.sa_flags & libc::SA_SIGINFO == 0 {
+        // FIXME: remove this workaround when the PR to libc get merged and released
+        //
+        // This is a workaround for the type mismatch in the definition of SA_*
+        // constants for android. See https://github.com/rust-lang/libc/pull/511
+        //
+        if state.prev.sa_flags & _as!(libc::SA_SIGINFO, state.prev.sa_flags) == 0 {
             let action = mem::transmute::<usize, FnHandler>(fnptr);
             action(signum)
         } else {
