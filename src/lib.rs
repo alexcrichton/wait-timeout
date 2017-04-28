@@ -5,8 +5,8 @@
 //! is fairly trivial as it's just a call to `WaitForSingleObject` with a
 //! timeout argument, but on Unix the implementation is much more involved. The
 //! current implementation registeres a `SIGCHLD` handler and initializes some
-//! global state. If your application is otherwise handling `SIGCHLD` then bugs
-//! may arise.
+//! global state. This handler also works within multi-threaded environments.
+//! If your application is otherwise handling `SIGCHLD` then bugs may arise.
 //!
 //! # Example
 //!
