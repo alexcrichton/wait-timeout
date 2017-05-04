@@ -17,7 +17,8 @@ extern "system" {
     fn GetExitCodeProcess(hProcess: HANDLE, lpExitCode: LPDWORD) -> BOOL;
 }
 
-#[derive(Eq, PartialEq, Copy, Clone, Debug)]
+// This should be exactly the same as std::sys::windows::process::ExitStatus!
+#[derive(PartialEq, Eq, Clone, Copy, Debug)]
 pub struct ExitStatus(DWORD);
 
 pub fn wait_timeout(child: &mut Child, dur: Duration)
@@ -44,10 +45,3 @@ pub fn wait_timeout(child: &mut Child, dur: Duration)
         }
     }
 }
-
-impl ExitStatus {
-    pub fn success(&self) -> bool { self.code() == Some(0) }
-    pub fn code(&self) -> Option<i32> { Some(self.0 as i32) }
-    pub fn unix_signal(&self) -> Option<i32> { None }
-}
-
