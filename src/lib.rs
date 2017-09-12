@@ -84,6 +84,7 @@ pub trait ChildExt {
 
 impl ChildExt for Child {
     fn wait_timeout(&mut self, dur: Duration) -> io::Result<Option<ExitStatus>> {
+        drop(self.stdin.take());
         imp::wait_timeout(self, dur).map(|m| m.map(ExitStatus))
     }
 }
