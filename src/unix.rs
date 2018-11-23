@@ -25,7 +25,7 @@ use std::mem;
 use std::os::unix::prelude::*;
 use std::process::{Child, ExitStatus};
 use std::sync::{Once, ONCE_INIT, Mutex};
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
 use libc::{self, c_int};
 
@@ -67,6 +67,8 @@ impl State {
             // Create our "self pipe" and then set both ends to nonblocking
             // mode.
             let (read, write) = UnixStream::pair().unwrap();
+            read.set_nonblocking(true).unwrap();
+            write.set_nonblocking(true).unwrap();
 
             let mut state = Box::new(State {
                 prev: mem::zeroed(),
@@ -100,7 +102,8 @@ impl State {
         // First up, prep our notification pipe which will tell us when our
         // child has been reaped (other threads may signal this pipe).
         let (read, write) = UnixStream::pair()?;
-        let id = child.id() as c_int;
+        read.set_nonblocking(true)?;
+        write.set_nonblocking(true)?;
 
         // Next, take a lock on the map of children currently waiting. Right
         // after this, **before** we add ourselves to the map, we check to see
@@ -130,7 +133,7 @@ impl State {
                 drop(map.remove(&(self.child as *mut Child)));
             }
         }
-        let _drop = Remove { state: self, child };
+        let remove = Remove { state: self, child };
 
 
         // Alright, we're guaranteed that we'll eventually get a SIGCHLD due
@@ -141,31 +144,38 @@ impl State {
         // Note that this happens in a loop for two reasons; we could
         // receive EINTR or we could pick up a SIGCHLD for other threads but not
         // actually be ready oureslves.
-        let end_time = now_ns();
+        let start = Instant::now();
+        let mut fds = [
+            libc::pollfd {
+                fd: self.read.as_raw_fd(),
+                events: libc::POLLIN,
+
+                revents: 0,
+            },
+            libc::pollfd {
+                fd: read.as_raw_fd(),
+                events: libc::POLLIN,
+                revents: 0,
+            },
+        ];
         loop {
-            let cur_time = now_ns();
-            let nanos = cur_time - end_time;
-            let elapsed = Duration::new(nanos / 1_000_000_000,
-                                        (nanos % 1_000_000_000) as u32);
+            let elapsed = start.elapsed();
             if elapsed >= dur {
                 break
             }
             let timeout = dur - elapsed;
-            let mut timeout = libc::timeval {
-                tv_sec: timeout.as_secs() as libc::time_t,
-                tv_usec: (timeout.subsec_nanos() / 1000) as libc::suseconds_t,
-            };
+            let timeout = timeout.as_secs().checked_mul(1_000)
+                .and_then(|amt| {
+                    amt.checked_add(timeout.subsec_nanos() as u64 / 1_000_000)
+                })
+                .unwrap_or(u64::max_value());
+            let timeout = cmp::min(<c_int>::max_value() as u64, timeout) as c_int;
             let r = unsafe {
-                let mut set: libc::fd_set = mem::uninitialized();
-                libc::FD_ZERO(&mut set);
-                libc::FD_SET(self.read.as_raw_fd(), &mut set);
-                libc::FD_SET(read.as_raw_fd(), &mut set);
-                let max = cmp::max(self.read.as_raw_fd(), read.as_raw_fd()) + 1;
-                libc::select(max, &mut set, 0 as *mut _, 0 as *mut _, &mut timeout)
+                libc::poll(fds.as_mut_ptr(), 2, timeout)
             };
             let timeout = match r {
                 0 => true,
-                1 | 2 => false,
+                n if n > 0 => false,
                 n => {
                     let err = io::Error::last_os_error();
                     if err.kind() == io::ErrorKind::Interrupted {
@@ -204,7 +214,8 @@ impl State {
         }
 
         let mut map = self.map.lock().unwrap();
-        let (_write, ret) = map.remove(&(id as *mut Child)).unwrap();
+        let (_write, ret) = map.remove(&(remove.child as *mut Child)).unwrap();
+        drop(map);
         Ok(ret)
     }
 
@@ -249,14 +260,6 @@ fn notify(mut file: &UnixStream) {
                 panic!("bad error on write fd: {}", e)
             }
         }
-    }
-}
-
-fn now_ns() -> u64 {
-    unsafe {
-        let mut now: libc::timeval = mem::zeroed();
-        libc::gettimeofday(&mut now, 0 as *mut _);
-        (now.tv_sec as u64 * 1_000_000_000) + (now.tv_usec as u64 * 1_000)
     }
 }
 
