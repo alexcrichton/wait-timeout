@@ -57,20 +57,6 @@ pub trait ChildExt {
     /// If `Ok(None)` is returned then the timeout period elapsed without the
     /// child exiting, and if `Ok(Some(..))` is returned then the child exited
     /// with the specified exit code.
-    ///
-    /// # Warning
-    ///
-    /// Currently this function must be called with great care. If the child
-    /// has already been waited on (e.g. `wait` returned a success) then this
-    /// function will either wait on another process or fail spuriously on some
-    /// platforms. This function may only be reliably called if the process has
-    /// not already been waited on.
-    ///
-    /// Additionally, once this method completes the original child cannot be
-    /// waited on reliably. The `wait` method on the original child may return
-    /// spurious errors or have odd behavior on some platforms. If this
-    /// function returns `Ok(None)`, however, it is safe to wait on the child
-    /// with the normal libstd `wait` method.
     fn wait_timeout(&mut self, dur: Duration) -> io::Result<Option<ExitStatus>>;
 }
 
