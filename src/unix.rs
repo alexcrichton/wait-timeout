@@ -23,7 +23,7 @@ use std::fs::File;
 use std::io::{self, Write, Read};
 use std::mem;
 use std::os::unix::prelude::*;
-use std::process::Child;
+use std::process::{Child, ExitStatus};
 use std::sync::{Once, ONCE_INIT, Mutex};
 use std::time::Duration;
 
@@ -40,9 +40,6 @@ struct State {
 }
 
 type StateMap = HashMap<c_int, (File, Option<ExitStatus>)>;
-
-#[derive(Eq, PartialEq, Copy, Clone, Debug)]
-pub struct ExitStatus(c_int);
 
 pub fn wait_timeout(child: &mut Child, dur: Duration)
                     -> io::Result<Option<ExitStatus>> {
@@ -233,7 +230,7 @@ fn try_wait(id: c_int) -> io::Result<Option<ExitStatus>> {
         n if n < 0 => return Err(io::Error::last_os_error()),
         n => {
             assert_eq!(n, id);
-            Ok(Some(ExitStatus(status)))
+            Ok(Some(ExitStatus::from_raw(status)))
         }
     }
 }
@@ -312,32 +309,6 @@ extern fn sigchld_handler(signum: c_int,
         } else {
             let action = mem::transmute::<usize, FnSigaction>(fnptr);
             action(signum, info, ptr)
-        }
-    }
-}
-
-impl ExitStatus {
-    pub fn success(&self) -> bool {
-        self.code() == Some(0)
-    }
-
-    pub fn code(&self) -> Option<i32> {
-        unsafe {
-            if libc::WIFEXITED(self.0) {
-                Some(libc::WEXITSTATUS(self.0))
-            } else {
-                None
-            }
-        }
-    }
-
-    pub fn unix_signal(&self) -> Option<i32> {
-        unsafe {
-            if !libc::WIFEXITED(self.0) {
-                Some(libc::WTERMSIG(self.0))
-            } else {
-                None
-            }
         }
     }
 }

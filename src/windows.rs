@@ -1,6 +1,7 @@
 use std::io;
 use std::os::windows::prelude::*;
-use std::process::Child;
+use std::os::windows::process::ExitStatusExt;
+use std::process::{Child, ExitStatus};
 use std::time::Duration;
 
 type DWORD = u32;
@@ -16,9 +17,6 @@ extern "system" {
     fn WaitForSingleObject(hHandle: HANDLE, dwMilliseconds: DWORD) -> DWORD;
     fn GetExitCodeProcess(hProcess: HANDLE, lpExitCode: LPDWORD) -> BOOL;
 }
-
-#[derive(Eq, PartialEq, Copy, Clone, Debug)]
-pub struct ExitStatus(DWORD);
 
 pub fn wait_timeout(child: &mut Child, dur: Duration)
                        -> io::Result<Option<ExitStatus>> {
@@ -40,14 +38,7 @@ pub fn wait_timeout(child: &mut Child, dur: Duration)
         if GetExitCodeProcess(child.as_raw_handle() as *mut _, &mut status) == FALSE {
             Err(io::Error::last_os_error())
         } else {
-            Ok(Some(ExitStatus(status)))
+            Ok(Some(ExitStatus::from_raw(status)))
         }
     }
 }
-
-impl ExitStatus {
-    pub fn success(&self) -> bool { self.code() == Some(0) }
-    pub fn code(&self) -> Option<i32> { Some(self.0 as i32) }
-    pub fn unix_signal(&self) -> Option<i32> { None }
-}
-
