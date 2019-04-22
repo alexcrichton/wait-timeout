@@ -16,7 +16,7 @@ extern "system" {
 pub fn wait_timeout(child: &mut Child, dur: Duration)
                        -> io::Result<Option<ExitStatus>> {
     let ms = dur.as_millis();
-    let ms = if ms > (DWORD::max_value() as u64) {
+    let ms = if ms > (DWORD::max_value() as u128) {
         DWORD::max_value()
     } else {
         ms as DWORD
