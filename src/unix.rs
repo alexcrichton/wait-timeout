@@ -164,11 +164,7 @@ impl State {
                 break
             }
             let timeout = dur - elapsed;
-            let timeout = timeout.as_secs().checked_mul(1_000)
-                .and_then(|amt| {
-                    amt.checked_add(timeout.subsec_nanos() as u64 / 1_000_000)
-                })
-                .unwrap_or(u64::max_value());
+            let timeout = timeout.as_millis() as u64;
             let timeout = cmp::min(<c_int>::max_value() as u64, timeout) as c_int;
             let r = unsafe {
                 libc::poll(fds.as_mut_ptr(), 2, timeout)

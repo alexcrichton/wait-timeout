@@ -2,11 +2,17 @@
 //!
 //! This crate is an implementation for Unix and Windows of the ability to wait
 //! on a child process with a timeout specified. On Windows the implementation
-//! is fairly trivial as it's just a call to `WaitForSingleObject` with a
-//! timeout argument, but on Unix the implementation is much more involved. The
+//! is fairly trivial as it's just a call to [`WaitForSingleObject`] with a
+//! timeout argument. The maximum timeout is therefore `u32::max_value()` milliseconds.
+//!
+//! But on Unix on the other hand, the implementation is much more involved. The
 //! current implementation registers a `SIGCHLD` handler and initializes some
 //! global state. This handler also works within multi-threaded environments.
 //! If your application is otherwise handling `SIGCHLD` then bugs may arise.
+//! Because of the usage of [`poll`], the maximum timout is only `u16::max_value()`.
+//!
+//! [`WaitForSingleObject`]: https://docs.microsoft.com/en-us/windows/desktop/api/synchapi/nf-synchapi-waitforsingleobject
+//! [`poll`]: http://man7.org/linux/man-pages/man2/poll.2.html
 //!
 //! # Example
 //!
