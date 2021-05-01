@@ -18,4 +18,4 @@ travis-ci = { repository = "alexcrichton/wait-timeout" }
 appveyor = { repository = "alexcrichton/wait-timeout" }
 
 [target.'cfg(unix)'.dependencies]
-libc = "0.2"
+libc = "0.2.56"

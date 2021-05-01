@@ -49,17 +49,6 @@ pub fn wait_timeout(child: &mut Child, dur: Duration)
     }
 }
 
-// Do $value as type_of($target)
-macro_rules! _as {
-    ($value:expr, $target:expr) => (
-        {
-            let mut x = $target;
-            x = $value as _;
-            x
-        }
-    )
-}
-
 impl State {
     #[allow(unused_assignments)]
     fn init() {
@@ -80,16 +69,7 @@ impl State {
             // Register our sigchld handler
             let mut new: libc::sigaction = mem::zeroed();
             new.sa_sigaction = sigchld_handler as usize;
-
-            // FIXME: remove this workaround when the PR to libc get merged and released
-            //
-            // This is a workaround for the type mismatch in the definition of SA_*
-            // constants for android. See https://github.com/rust-lang/libc/pull/511
-            //
-            let sa_flags = new.sa_flags;
-            new.sa_flags = _as!(libc::SA_NOCLDSTOP, sa_flags) |
-                           _as!(libc::SA_RESTART, sa_flags) |
-                           _as!(libc::SA_SIGINFO, sa_flags);
+            new.sa_flags = libc::SA_NOCLDSTOP | libc::SA_RESTART | libc::SA_SIGINFO;
 
             assert_eq!(libc::sigaction(libc::SIGCHLD, &new, &mut state.prev), 0);
 
@@ -289,12 +269,7 @@ extern fn sigchld_handler(signum: c_int,
         if fnptr == 0 {
             return
         }
-        // FIXME: remove this workaround when the PR to libc get merged and released
-        //
-        // This is a workaround for the type mismatch in the definition of SA_*
-        // constants for android. See https://github.com/rust-lang/libc/pull/511
-        //
-        if state.prev.sa_flags & _as!(libc::SA_SIGINFO, state.prev.sa_flags) == 0 {
+        if state.prev.sa_flags & libc::SA_SIGINFO == 0 {
             let action = mem::transmute::<usize, FnHandler>(fnptr);
             action(signum)
         } else {
