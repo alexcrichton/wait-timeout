@@ -24,12 +24,12 @@ use std::os::unix::net::UnixStream;
 use std::mem;
 use std::os::unix::prelude::*;
 use std::process::{Child, ExitStatus};
-use std::sync::{Once, ONCE_INIT, Mutex};
+use std::sync::{Once, Mutex};
 use std::time::{Duration, Instant};
 
 use libc::{self, c_int};
 
-static INIT: Once = ONCE_INIT;
+static INIT: Once = Once::new();
 static mut STATE: *mut State = 0 as *mut _;
 
 struct State {
