@@ -1,6 +1,6 @@
 # wait-timeout
 
-[![Build Status](https://travis-ci.org/alexcrichton/wait-timeout.svg?branch=master)](https://travis-ci.org/alexcrichton/wait-timeout)
+[![Build Status](https://github.com/alexcrichton/wait-timeout/actions/workflows/main.yml/badge.svg?branch=master)](https://github.com/alexcrichton/wait-timeout/actions/workflows/main.yml)
 [![Build status](https://ci.appveyor.com/api/projects/status/3t5mh1c8i4lnolma?svg=true)](https://ci.appveyor.com/project/alexcrichton/wait-timeout)
 
 [Documentation](https://docs.rs/wait-timeout)
