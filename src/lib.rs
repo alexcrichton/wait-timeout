@@ -38,9 +38,11 @@ use std::io;
 use std::process::{Child, ExitStatus};
 use std::time::Duration;
 
-#[cfg(unix)] #[path = "unix.rs"]
+#[cfg(unix)]
+#[path = "unix.rs"]
 mod imp;
-#[cfg(windows)] #[path = "windows.rs"]
+#[cfg(windows)]
+#[path = "windows.rs"]
 mod imp;
 
 /// Extension methods for the standard `std::process::Child` type.

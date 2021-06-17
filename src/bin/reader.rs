@@ -1,4 +1,4 @@
-use std::io::{Read, stdin};
+use std::io::{stdin, Read};
 
 #[allow(unused_must_use)]
 fn main() {
