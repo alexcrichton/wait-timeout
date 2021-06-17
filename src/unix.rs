@@ -193,8 +193,9 @@ impl State {
             }
         }
 
-        // drop impl on Remove will remove this child from the map
-
+        let mut map = self.map.lock().unwrap();
+        let (_write, ret) = map.remove(&(remove.child as *mut Child)).unwrap();
+        drop(map);
         Ok(ret)
     }
 
