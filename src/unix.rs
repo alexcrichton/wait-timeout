@@ -65,7 +65,15 @@ impl State {
 
             // Register our sigchld handler
             let mut new: libc::sigaction = mem::zeroed();
-            new.sa_sigaction = sigchld_handler as usize;
+
+            #[cfg(not(target_os = "aix"))]
+            let set_handler =
+                |action: &mut libc::sigaction, handler| action.sa_sigaction = handler as usize;
+            #[cfg(target_os = "aix")]
+            let set_handler =
+                |action: &mut libc::sigaction, handler| action.sa_union.__su_sigaction = handler;
+            set_handler(&mut new, sigchld_handler);
+
             new.sa_flags = libc::SA_NOCLDSTOP | libc::SA_RESTART | libc::SA_SIGINFO;
 
             assert_eq!(libc::sigaction(libc::SIGCHLD, &new, &mut state.prev), 0);
@@ -256,7 +264,11 @@ extern "C" fn sigchld_handler(signum: c_int, info: *mut libc::siginfo_t, ptr: *m
         let state = &*STATE;
         notify(&state.write);
 
+        #[cfg(not(target_os = "aix"))]
         let fnptr = state.prev.sa_sigaction;
+        #[cfg(target_os = "aix")]
+        let fnptr = state.prev.sa_union.__su_sigaction as usize;
+
         if fnptr == 0 {
             return;
         }
