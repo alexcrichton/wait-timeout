@@ -18,7 +18,7 @@ pub fn wait_timeout(child: &mut Child, mut dur: Duration) -> io::Result<Option<E
     loop {
         let elapsed = start.elapsed();
         if elapsed >= dur {
-            break;
+            return Ok(None);
         }
         let timeout = dur - elapsed;
         let ms = timeout.as_millis();
