@@ -16,7 +16,6 @@
 //! data out of the signal handler to the rest of the application.
 
 use libc::c_int;
-use std::cmp;
 use std::collections::HashMap;
 use std::io::{self, Read, Write};
 use std::mem;
@@ -139,8 +138,8 @@ impl State {
                 .as_secs()
                 .checked_mul(1_000)
                 .and_then(|amt| amt.checked_add(timeout.subsec_nanos() as u64 / 1_000_000))
-                .unwrap_or(u64::max_value());
-            let timeout = cmp::min(<c_int>::max_value() as u64, timeout) as c_int;
+                .unwrap_or(u64::MAX);
+            let timeout = c_int::try_from(timeout).unwrap_or(c_int::MAX);
             let r = unsafe { libc::poll(fds.as_mut_ptr(), 2, timeout) };
             let timeout = match r {
                 0 => true,
@@ -189,13 +188,13 @@ impl State {
     }
 
     fn process_sigchlds(&self, map: &mut StateMap) {
-        for (&k, &mut (ref write, ref mut status)) in map {
+        for (k, (write, status)) in map {
             // Already reaped, nothing to do here
             if status.is_some() {
                 continue;
             }
 
-            *status = unsafe { (*k).try_wait().unwrap() };
+            *status = unsafe { (**k).try_wait().unwrap() };
             if status.is_some() {
                 notify(write);
             }
