@@ -12,6 +12,7 @@ A crate to wait on a child process with a timeout specified across Unix and
 Windows platforms.
 """
 categories = ["os"]
+edition = '2021'
 
 [badges]
 travis-ci = { repository = "alexcrichton/wait-timeout" }
