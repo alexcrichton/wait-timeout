@@ -56,7 +56,7 @@ impl State {
             read.set_nonblocking(true).unwrap();
             write.set_nonblocking(true).unwrap();
 
-            let mut state = Box::new(State {
+            let state = Box::new(State {
                 prev: mem::zeroed(),
                 write: write,
                 read: read,
@@ -68,9 +68,9 @@ impl State {
             new.sa_sigaction = sigchld_handler as usize;
             new.sa_flags = libc::SA_NOCLDSTOP | libc::SA_RESTART | libc::SA_SIGINFO;
 
-            assert_eq!(libc::sigaction(libc::SIGCHLD, &new, &mut state.prev), 0);
+            STATE = Box::into_raw(state);
 
-            STATE = mem::transmute(state);
+            assert_eq!(libc::sigaction(libc::SIGCHLD, &new, &mut (*STATE).prev), 0);
         }
     }
 
