@@ -6,15 +6,6 @@ use std::time::{Duration, Instant};
 
 use wait_timeout::ChildExt;
 
-macro_rules! t {
-    ($e:expr) => {
-        match $e {
-            Ok(e) => e,
-            Err(e) => panic!("{} failed with {}", stringify!($e), e),
-        }
-    };
-}
-
 fn sleeper(ms: u32) -> Child {
     let mut me = env::current_exe().unwrap();
     me.pop();
@@ -22,7 +13,7 @@ fn sleeper(ms: u32) -> Child {
         me.pop();
     }
     me.push("sleep");
-    t!(Command::new(me).arg(ms.to_string()).spawn())
+    Command::new(me).arg(ms.to_string()).spawn().unwrap()
 }
 
 fn exit(code: u32) -> Child {
@@ -32,7 +23,7 @@ fn exit(code: u32) -> Child {
         me.pop();
     }
     me.push("exit");
-    t!(Command::new(me).arg(code.to_string()).spawn())
+    Command::new(me).arg(code.to_string()).spawn().unwrap()
 }
 
 fn reader() -> Child {
@@ -42,16 +33,16 @@ fn reader() -> Child {
         me.pop();
     }
     me.push("reader");
-    t!(Command::new(me).stdin(Stdio::piped()).spawn())
+    Command::new(me).stdin(Stdio::piped()).spawn().unwrap()
 }
 
 #[test]
 fn smoke_insta_timeout() {
     let mut child = sleeper(1_000);
-    assert_eq!(t!(child.wait_timeout_ms(0)), None);
+    assert_eq!(child.wait_timeout_ms(0).unwrap(), None);
 
-    t!(child.kill());
-    let status = t!(child.wait());
+    child.kill().unwrap();
+    let status = child.wait().unwrap();
     assert!(!status.success());
 }
 
@@ -59,7 +50,10 @@ fn smoke_insta_timeout() {
 fn smoke_success() {
     let start = Instant::now();
     let mut child = sleeper(0);
-    let status = t!(child.wait_timeout_ms(1_000)).expect("should have succeeded");
+    let status = child
+        .wait_timeout_ms(1_000)
+        .unwrap()
+        .expect("should have succeeded");
     assert!(status.success());
 
     assert!(start.elapsed() < Duration::from_millis(500));
@@ -69,11 +63,11 @@ fn smoke_success() {
 fn smoke_timeout() {
     let mut child = sleeper(1_000_000);
     let start = Instant::now();
-    assert_eq!(t!(child.wait_timeout_ms(100)), None);
+    assert_eq!(child.wait_timeout_ms(100).unwrap(), None);
     assert!(start.elapsed() > Duration::from_millis(80));
 
-    t!(child.kill());
-    let status = t!(child.wait());
+    child.kill().unwrap();
+    let status = child.wait().unwrap();
     assert!(!status.success());
 }
 
@@ -81,25 +75,25 @@ fn smoke_timeout() {
 fn smoke_reader() {
     let mut child = reader();
     let dur = Duration::from_millis(100);
-    let status = t!(child.wait_timeout(dur)).unwrap();
+    let status = child.wait_timeout(dur).unwrap().unwrap();
     assert!(status.success());
 }
 
 #[test]
 fn exit_codes() {
     let mut child = exit(0);
-    let status = t!(child.wait_timeout_ms(1_000)).unwrap();
+    let status = child.wait_timeout_ms(1_000).unwrap().unwrap();
     assert_eq!(status.code(), Some(0));
 
     let mut child = exit(1);
-    let status = t!(child.wait_timeout_ms(1_000)).unwrap();
+    let status = child.wait_timeout_ms(1_000).unwrap().unwrap();
     assert_eq!(status.code(), Some(1));
 
     // check STILL_ACTIVE on windows, on unix this ends up just getting
     // truncated so don't bother with it.
     if cfg!(windows) {
         let mut child = exit(259);
-        let status = t!(child.wait_timeout_ms(1_000)).unwrap();
+        let status = child.wait_timeout_ms(1_000).unwrap().unwrap();
         assert_eq!(status.code(), Some(259));
     }
 }
