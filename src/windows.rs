@@ -13,7 +13,7 @@ extern "system" {
     fn WaitForSingleObject(hHandle: HANDLE, dwMilliseconds: DWORD) -> DWORD;
 }
 
-pub fn wait_timeout(child: &mut Child, mut dur: Duration) -> io::Result<Option<ExitStatus>> {
+pub fn wait_timeout(child: &mut Child, dur: Duration) -> io::Result<Option<ExitStatus>> {
     let start = Instant::now();
     loop {
         let elapsed = start.elapsed();
