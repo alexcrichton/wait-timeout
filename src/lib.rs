@@ -31,9 +31,6 @@
 #![deny(missing_docs, warnings)]
 #![doc(html_root_url = "https://docs.rs/wait-timeout/0.1")]
 
-#[cfg(unix)]
-extern crate libc;
-
 use std::io;
 use std::process::{Child, ExitStatus};
 use std::time::Duration;

@@ -1,6 +1,5 @@
-extern crate wait_timeout;
-
 use std::env;
+use std::io::Read;
 use std::process::{Child, Command, Stdio};
 use std::time::{Duration, Instant};
 
@@ -33,7 +32,11 @@ fn reader() -> Child {
         me.pop();
     }
     me.push("reader");
-    Command::new(me).stdin(Stdio::piped()).spawn().unwrap()
+    Command::new(me)
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .spawn()
+        .unwrap()
 }
 
 #[test]
@@ -74,6 +77,11 @@ fn smoke_timeout() {
 #[test]
 fn smoke_reader() {
     let mut child = reader();
+
+    // wait for the child to start and print something
+    let mut buf = [0; 20];
+    let _ = child.stdout.take().unwrap().read(&mut buf);
+
     let dur = Duration::from_millis(100);
     let status = child.wait_timeout(dur).unwrap().unwrap();
     assert!(status.success());
