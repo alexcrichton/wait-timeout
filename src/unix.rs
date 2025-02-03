@@ -15,9 +15,7 @@
 //! to the async nature of SIGCHLD, we use the self-pipe trick to transmit
 //! data out of the signal handler to the rest of the application.
 
-#![allow(bad_style)]
-
-use std::cmp;
+use libc::c_int;
 use std::collections::HashMap;
 use std::io::{self, Read, Write};
 use std::mem;
@@ -26,8 +24,6 @@ use std::os::unix::prelude::*;
 use std::process::{Child, ExitStatus};
 use std::sync::{Mutex, Once};
 use std::time::{Duration, Instant};
-
-use libc::{self, c_int};
 
 static INIT: Once = Once::new();
 static mut STATE: *mut State = 0 as *mut _;
@@ -47,7 +43,6 @@ pub fn wait_timeout(child: &mut Child, dur: Duration) -> io::Result<Option<ExitS
 }
 
 impl State {
-    #[allow(unused_assignments)]
     fn init() {
         unsafe {
             // Create our "self pipe" and then set both ends to nonblocking
@@ -143,8 +138,8 @@ impl State {
                 .as_secs()
                 .checked_mul(1_000)
                 .and_then(|amt| amt.checked_add(timeout.subsec_nanos() as u64 / 1_000_000))
-                .unwrap_or(u64::max_value());
-            let timeout = cmp::min(<c_int>::max_value() as u64, timeout) as c_int;
+                .unwrap_or(u64::MAX);
+            let timeout = c_int::try_from(timeout).unwrap_or(c_int::MAX);
             let r = unsafe { libc::poll(fds.as_mut_ptr(), 2, timeout) };
             let timeout = match r {
                 0 => true,
@@ -193,13 +188,13 @@ impl State {
     }
 
     fn process_sigchlds(&self, map: &mut StateMap) {
-        for (&k, &mut (ref write, ref mut status)) in map {
+        for (k, (write, status)) in map {
             // Already reaped, nothing to do here
             if status.is_some() {
                 continue;
             }
 
-            *status = unsafe { (*k).try_wait().unwrap() };
+            *status = unsafe { (**k).try_wait().unwrap() };
             if status.is_some() {
                 notify(write);
             }
@@ -247,7 +242,6 @@ fn notify(mut file: &UnixStream) {
 // it. At that point we're guaranteed that there's something in the pipe
 // which will wake up the other end at some point, so we just allow this
 // signal to be coalesced with the pending signals on the pipe.
-#[allow(unused_assignments)]
 extern "C" fn sigchld_handler(signum: c_int, info: *mut libc::siginfo_t, ptr: *mut libc::c_void) {
     type FnSigaction = extern "C" fn(c_int, *mut libc::siginfo_t, *mut libc::c_void);
     type FnHandler = extern "C" fn(c_int);
