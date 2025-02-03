@@ -15,8 +15,7 @@
 //! to the async nature of SIGCHLD, we use the self-pipe trick to transmit
 //! data out of the signal handler to the rest of the application.
 
-#![allow(bad_style)]
-
+use libc::c_int;
 use std::cmp;
 use std::collections::HashMap;
 use std::io::{self, Read, Write};
@@ -26,8 +25,6 @@ use std::os::unix::prelude::*;
 use std::process::{Child, ExitStatus};
 use std::sync::{Mutex, Once};
 use std::time::{Duration, Instant};
-
-use libc::{self, c_int};
 
 static INIT: Once = Once::new();
 static mut STATE: *mut State = 0 as *mut _;
@@ -47,7 +44,6 @@ pub fn wait_timeout(child: &mut Child, dur: Duration) -> io::Result<Option<ExitS
 }
 
 impl State {
-    #[allow(unused_assignments)]
     fn init() {
         unsafe {
             // Create our "self pipe" and then set both ends to nonblocking
@@ -247,7 +243,6 @@ fn notify(mut file: &UnixStream) {
 // it. At that point we're guaranteed that there's something in the pipe
 // which will wake up the other end at some point, so we just allow this
 // signal to be coalesced with the pending signals on the pipe.
-#[allow(unused_assignments)]
 extern "C" fn sigchld_handler(signum: c_int, info: *mut libc::siginfo_t, ptr: *mut libc::c_void) {
     type FnSigaction = extern "C" fn(c_int, *mut libc::siginfo_t, *mut libc::c_void);
     type FnHandler = extern "C" fn(c_int);
