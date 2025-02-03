@@ -42,9 +42,9 @@ mod imp;
 #[path = "windows.rs"]
 mod imp;
 
-/// Extension methods for the standard `std::process::Child` type.
+/// Extension methods for the standard [`std::process::Child`] type.
 pub trait ChildExt {
-    /// Deprecated, use `wait_timeout` instead.
+    /// Deprecated, use [`ChildExt::wait_timeout`] instead.
     #[doc(hidden)]
     fn wait_timeout_ms(&mut self, ms: u32) -> io::Result<Option<ExitStatus>> {
         self.wait_timeout(Duration::from_millis(ms as u64))
