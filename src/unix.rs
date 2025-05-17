@@ -89,6 +89,9 @@ impl State {
         if let Some(status) = child.try_wait()? {
             return Ok(Some(status));
         }
+        // Accessing a &mut reference invalidates any *mut pointers obtained from that reference.
+        // Shadow the reference to make sure we don't touch it again.
+        let child: *mut Child = child;
         assert!(map.insert(child, (write, None)).is_none());
         drop(map);
 
@@ -96,12 +99,12 @@ impl State {
         // from the map.
         struct Remove<'a> {
             state: &'a State,
-            child: &'a mut Child,
+            child: *mut Child,
         }
         impl<'a> Drop for Remove<'a> {
             fn drop(&mut self) {
                 let mut map = self.state.map.lock().unwrap();
-                drop(map.remove(&(self.child as *mut Child)));
+                drop(map.remove(&self.child));
             }
         }
         let remove = Remove { state: self, child };
