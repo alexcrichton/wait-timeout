@@ -61,7 +61,12 @@ impl State {
             // Register our sigchld handler
             let mut new: libc::sigaction = mem::zeroed();
             new.sa_sigaction = sigchld_handler as *const () as usize;
-            new.sa_flags = libc::SA_NOCLDSTOP | libc::SA_RESTART | libc::SA_SIGINFO;
+            new.sa_flags = libc::SA_NOCLDSTOP | libc::SA_SIGINFO;
+            // QNX has no SA_RESTART.
+            #[cfg(not(any(target_os = "nto", target_os = "qnx")))]
+            {
+                new.sa_flags |= libc::SA_RESTART;
+            }
 
             STATE = Box::into_raw(state);
 
