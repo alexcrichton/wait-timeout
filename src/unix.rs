@@ -60,7 +60,7 @@ impl State {
 
             // Register our sigchld handler
             let mut new: libc::sigaction = mem::zeroed();
-            new.sa_sigaction = sigchld_handler as usize;
+            new.sa_sigaction = sigchld_handler as *const () as usize;
             new.sa_flags = libc::SA_NOCLDSTOP | libc::SA_RESTART | libc::SA_SIGINFO;
 
             STATE = Box::into_raw(state);
