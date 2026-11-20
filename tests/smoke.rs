@@ -6,33 +6,21 @@ use std::time::{Duration, Instant};
 use wait_timeout::ChildExt;
 
 fn sleeper(ms: u32) -> Child {
-    let mut me = env::current_exe().unwrap();
-    me.pop();
-    if me.ends_with("deps") {
-        me.pop();
-    }
-    me.push("sleep");
-    Command::new(me).arg(ms.to_string()).spawn().unwrap()
+    Command::new(env!("CARGO_BIN_EXE_sleep"))
+        .arg(ms.to_string())
+        .spawn()
+        .unwrap()
 }
 
 fn exit(code: u32) -> Child {
-    let mut me = env::current_exe().unwrap();
-    me.pop();
-    if me.ends_with("deps") {
-        me.pop();
-    }
-    me.push("exit");
-    Command::new(me).arg(code.to_string()).spawn().unwrap()
+    Command::new(env!("CARGO_BIN_EXE_exit"))
+        .arg(code.to_string())
+        .spawn()
+        .unwrap()
 }
 
 fn reader() -> Child {
-    let mut me = env::current_exe().unwrap();
-    me.pop();
-    if me.ends_with("deps") {
-        me.pop();
-    }
-    me.push("reader");
-    Command::new(me)
+    Command::new(env!("CARGO_BIN_EXE_reader"))
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
         .spawn()
